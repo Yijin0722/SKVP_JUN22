@@ -31,8 +31,10 @@ PROGRAM skvpAtomDiatom
  INTEGER :: t
  INTEGER :: j1, j2, j1low, j2low
  INTEGER :: k1, k2, k1range, k2range
- INTEGER                                  :: step, n_steps 
-INTEGER, PARAMETER                       :: proba_all_unit = 101
+ INTEGER                                  :: step, n_steps
+ INTEGER, PARAMETER                       :: proba_0000_unit = 100
+ INTEGER, PARAMETER                       :: proba_all_unit = 101
+ INTEGER, PARAMETER                       :: proba_2020_unit = 102
 
  REAL(8)                                  :: tm1, tm2, pas_x, yy=0.020d0
  REAL(8)                                  :: x1, x2              !, DLAMCH
@@ -59,8 +61,9 @@ CALL calculate_RMS_potential_expansion
 
         CALL CPU_TIME(tm1)
 !
-        OPEN (100,file ='proba.dat',status='unknown',action='write',position='append')
+        OPEN (proba_0000_unit,file='praba_0000.dat',status='unknown',action='write',position='append')
         OPEN (proba_all_unit,file='proba_all.dat',status='unknown', action='write',position='append')
+        OPEN (proba_2020_unit,file='praba_2020.dat',status='unknown',action='write',position='append')
 !
 !
 ! Call for input paramaters reading routine
@@ -220,8 +223,9 @@ CALL calculate_RMS_potential_expansion
 
 !
         WRITE(6,*) 'PROBABILITIES at SOME ENERGY - ', step
-        WRITE(6,'(10E15.7)') E*27.211399d0,((abs(Smat(1,j))**2.D0),j=1,n_open)
-        WRITE(100,'(16E15.7)') E*27.211399d0, ((abs(Smat(1,j))**2.D0),j=1,n_open)
+        CALL WriteIncomingProbabilityRow(6, 0, 0, 0, 0)
+        CALL WriteIncomingProbabilityRow(proba_0000_unit, 0, 0, 0, 0)
+        CALL WriteIncomingProbabilityRow(proba_2020_unit, 2, 0, 2, 0)
 
         DO i = 1, n_open
         DO j = 1, n_open
@@ -325,8 +329,9 @@ CALL calculate_RMS_potential_expansion
 !*********************************************************************************************
 !*********************************************************************************************
 !
-CLOSE(100)
+CLOSE(proba_0000_unit)
 CLOSE(proba_all_unit)
+CLOSE(proba_2020_unit)
  END PROGRAM skvpAtomDiatom
 !
 !*********************************************************************************************
@@ -334,6 +339,51 @@ CLOSE(proba_all_unit)
 !*********************************************************************************************
 !
 !
+!
+!*********************************************************************************************
+!*********************************************************************************************
+!*********************************************************************************************
+!
+ SUBROUTINE WriteIncomingProbabilityRow(out_unit, target_j1, target_k1, target_j2, target_k2)
+!
+!*********************************************************************************************
+!
+! Writes one probability row for the requested incoming open channel.
+!
+!=============================================================================================
+!
+        USE AtomDiatomskvp
+        USE generateparameters
+
+        IMPLICIT NONE
+
+        INTEGER, INTENT(IN) :: out_unit
+        INTEGER, INTENT(IN) :: target_j1, target_k1, target_j2, target_k2
+        INTEGER :: i, j, q, incoming_idx
+
+        incoming_idx = 0
+
+        DO i = 1, n_open
+                q = open_idx(i)
+                IF (quant_mat(1,q) == target_j1 .AND. &
+                    quant_mat(2,q) == target_k1 .AND. &
+                    quant_mat(3,q) == target_j2 .AND. &
+                    quant_mat(4,q) == target_k2) THEN
+                        incoming_idx = i
+                        EXIT
+                ENDIF
+        ENDDO
+
+        IF (incoming_idx > 0) THEN
+                WRITE(out_unit,'(16E15.7)') E*27.211399d0, &
+                        ((ABS(Smat(incoming_idx,j))**2.D0), j=1,n_open)
+        ELSE
+                WRITE(out_unit,'(16E15.7)') E*27.211399d0, (0d0, j=1,n_open)
+        ENDIF
+
+ END SUBROUTINE WriteIncomingProbabilityRow
+!
+!=============================================================================================
 !
 !*********************************************************************************************
 !*********************************************************************************************
