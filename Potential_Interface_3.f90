@@ -32,7 +32,7 @@ MODULE Potential_Interface
 
         REAL(dp), PARAMETER :: pi_A = 3.1415926535897932384626433832795_dp
 
-        INTEGER, PARAMETER :: A_cache_version = 1
+        INTEGER, PARAMETER :: A_cache_version = 2
         INTEGER, PARAMETER :: cache_id_len = 128
         CHARACTER(LEN=*), PARAMETER :: A_cache_filename = 'A_cache.dat'
         !CHARACTER(LEN=cache_id_len), PARAMETER :: potential_id = 'BMKP_cm-1_v1'
@@ -78,8 +78,8 @@ CONTAINS
 !       --------------------------------
                 n_pot = 0
 
-                DO lambda1 = 0, lambda1_max_in, 2
-                DO lambda2 = 0, lambda2_max_in, 2
+                DO lambda1 = 0, lambda1_max_in
+                DO lambda2 = 0, lambda2_max_in
                 DO m = 0, m_max_in
 
                         IF (m <= lambda1 .AND. m <= lambda2) THEN
@@ -111,8 +111,8 @@ CONTAINS
 !       ------------------------
                 ipot = 0
 
-                DO lambda1 = 0, lambda1_max_in, 2
-                DO lambda2 = 0, lambda2_max_in, 2
+                DO lambda1 = 0, lambda1_max_in
+                DO lambda2 = 0, lambda2_max_in
                 DO m = 0, m_max_in
 
                         IF (m <= lambda1 .AND. m <= lambda2) THEN
@@ -715,8 +715,8 @@ CONTAINS
 !
 !       Gaussian quadrature projection
 !       ------------------------------
-                DO lambda1 = 0, lambda1_max_default, 2
-                DO lambda2 = 0, lambda2_max_default, 2
+                DO lambda1 = 0, lambda1_max_default
+                DO lambda2 = 0, lambda2_max_default
                 DO m = 0, MIN(lambda1, lambda2, m_max_default)
 
                         A(lambda1,lambda2,m) = 0.0_dp
