@@ -8,12 +8,12 @@ ca_sym  = 'para'
 ca_nmd = 5
 ca_nest = 1
 r0 = 1.0E+01
-en_start = 17.64E-03, en_final = 18.37E-03, en_step = 0.918E-04
+en_start = 1E-08, en_final = 18.37E-03, en_step = 3.6E-04
 Jmin = 0, Jmax = 0
 /
 
 &Primitive_Basis
-pbasst(1) = 'R'   'bspl_fbr'   70  6  1.0E+00  16.0000E+00  0.0E+00
+pbasst(1) = 'R'   'bspl_fbr'   60  6  1.0E+00  16.0000E+00  0.0E+00
 pbasst(2) = 'th1'  'asleg_fbr'    4  2  0.0E+00  3.1415E+00  0.0E+00
 pbasst(3) = 'th2'  'asleg_fbr'    4  2  0.0E+00  3.1415E+00  0.0E+00
 pbasst(4) = 'phi1'  'exp'    3  1  0.0E+00  6.283185E+00  0.0E+00

@@ -7,7 +7,7 @@ cd "$workdir"
 
 input_file="input.nml"
 executable="./skvp_AtomDiatom"
-bspline_values=(80, 100, 120, 140  )
+bspline_values=(60 70 80)
 
 if [[ ! -f "$input_file" ]]; then
     echo "Error: $workdir/$input_file does not exist." >&2

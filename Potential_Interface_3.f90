@@ -20,9 +20,9 @@ MODULE Potential_Interface
 !
 !       Default angular expansion limits
 !       --------------------------------
-        INTEGER, PARAMETER :: lambda1_max_default = 3  !16
-        INTEGER, PARAMETER :: lambda2_max_default = 3 !16
-        INTEGER, PARAMETER :: m_max_default       = 3 !10
+        INTEGER, PARAMETER :: lambda1_max_default = 4  !16
+        INTEGER, PARAMETER :: lambda2_max_default = 4 !16
+        INTEGER, PARAMETER :: m_max_default       = 4 !10
 
 !
 !       Gaussian quadrature parameters for angular projection

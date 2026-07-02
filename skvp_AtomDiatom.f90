@@ -223,7 +223,10 @@ CALL calculate_RMS_potential_expansion
 
 !
         WRITE(6,*) 'PROBABILITIES at SOME ENERGY - ', step
+        WRITE(6,*) 'incoming (0,0,0,0)'
         CALL WriteIncomingProbabilityRow(6, 0, 0, 0, 0)
+        WRITE(6,*) 'incoming (2,0,2,0)'
+        CALL WriteIncomingProbabilityRow(6, 2, 0, 2, 0)
         CALL WriteIncomingProbabilityRow(proba_0000_unit, 0, 0, 0, 0)
         CALL WriteIncomingProbabilityRow(proba_2020_unit, 2, 0, 2, 0)
 
