@@ -106,7 +106,7 @@ CALL calculate_RMS_potential_expansion
 
         PRINT*, 'channel index: j1 k1 j2 k2'
         DO i = 1, ncf
-                WRITE(*,'(I5,4I6)') i, quant_mat(1,i), quant_mat(2,i), quant_mat(3,i), quant_mat(4,i)
+                WRITE(6,'(I5,4I6)') i, quant_mat(1,i), quant_mat(2,i), quant_mat(3,i), quant_mat(4,i)
         ENDDO
 
 !
@@ -189,7 +189,8 @@ CALL calculate_RMS_potential_expansion
  !       PRINT*, quant_mat(2, :) !quant_mat(2, 1:10)
  !       PRINT*, quant_mat(3, :) !quant_mat(3, 1:10)
  !       PRINT*, quant_mat(4, :) !quant_mat(4, 1:10)
-!
+
+
         !ALLOCATE(quant_mat(2,ncf))
         !nn = 1
         !DO j = 0, pbasst(2)%pb_nbr, 2
@@ -229,6 +230,7 @@ CALL calculate_RMS_potential_expansion
         CALL WriteIncomingProbabilityRow(6, 2, 0, 2, 0)
         CALL WriteIncomingProbabilityRow(proba_0000_unit, 0, 0, 0, 0)
         CALL WriteIncomingProbabilityRow(proba_2020_unit, 2, 0, 2, 0)
+
 
         DO i = 1, n_open
         DO j = 1, n_open
@@ -332,9 +334,14 @@ CALL calculate_RMS_potential_expansion
 !*********************************************************************************************
 !*********************************************************************************************
 !
+
 CLOSE(proba_0000_unit)
 CLOSE(proba_all_unit)
 CLOSE(proba_2020_unit)
+
+!Testing for angular momentum component
+!CALL test_wdd_5x5()
+
  END PROGRAM skvpAtomDiatom
 !
 !*********************************************************************************************
@@ -462,6 +469,7 @@ CLOSE(proba_2020_unit)
 ! Sample test routines call
 !--------------------------
         CALL PhaseShift
+        
 !
 !-------------------------------
 !       Allocation
@@ -939,6 +947,7 @@ PRINT*, '==============================='
         REAL(8), ALLOCATABLE :: sum_array(:), workx(:)
         REAL(8), ALLOCATABLE :: rhs_re(:,:), rhs_im(:,:), modul(:,:)
         REAL(8) :: work_query(1)
+        REAL(8) :: max_sym_error
 
         COMPLEX(8), ALLOCATABLE :: solution_M0(:,:)
         COMPLEX(8), ALLOCATABLE :: Bsub(:,:), Csub(:,:), Smat_st(:,:)
@@ -1102,6 +1111,10 @@ PRINT*, '==============================='
         ENDDO
         PRINT*, "Checking probabilities sum to one: ", sum_array(:)
         PRINT*, ' '
+
+        max_sym_error = MAXVAL(ABS(Smat - TRANSPOSE(Smat)))
+
+        PRINT *, 'max |S-S^T| = ', max_sym_error
         ! Adding data to output file
         ! IF (n_open >= 2) THEN
         !         open(unit=10, file="2_0.txt", status='unknown', position='append', action='write')

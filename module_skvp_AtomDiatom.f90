@@ -612,42 +612,58 @@ END FUNCTION plgndr
 !
 !
 
- 
 
 REAL(8) FUNCTION lambda_plus(jt,j,k,l)
-        INTEGER :: j, k, jt, lm, l
-        !IF (1d0*(j*(j+1) - k*(k+1)) < 0) THEN
-        !        PRINT*, "Complex Args in lambda_plus: j,k", j,k, 1d0*(j*(j+1) - k*(k+1))
-        !ENDIF
-        lm=min(j,jt)
-        IF (k>=lm) THEN
+        IMPLICIT NONE
+        INTEGER, INTENT(IN) :: jt, j, k, l
+        REAL(8) :: arg
+
         lambda_plus = 0d0
-        ENDIF
-        IF ((k>=-lm).AND.(k<lm)) THEN
-        IF (l==1) THEN  ! With Jt
-        lambda_plus = DSQRT(1d0*(jt*(jt+1) - k*(k+1)))
-        ELSE IF (l==2) THEN  ! With j
-        lambda_plus = DSQRT(1d0*(j*(j+1) - k*(k+1)))
-        ENDIF
-        ENDIF
+
+        SELECT CASE (l)
+
+        CASE (1)   ! J_+ acting on |J,K>
+                IF (k < -jt .OR. k >= jt) RETURN
+                arg = DBLE(jt*(jt+1) - k*(k+1))
+
+        CASE (2)   ! j_+ acting on |j,k>
+                IF (k < -j .OR. k >= j) RETURN
+                arg = DBLE(j*(j+1) - k*(k+1))
+
+        CASE DEFAULT
+                RETURN
+
+        END SELECT
+
+        lambda_plus = DSQRT(MAX(0d0,arg))
+
 END FUNCTION lambda_plus
 
+
 REAL(8) FUNCTION lambda_minus(jt,j,k,l)
-        INTEGER :: j, k, jt, lm, l
-        !IF (1d0*(j*(j+1) - k*(k-1)) < 0) THEN
-        !        PRINT*, "Complex Args in lambda_minus: j,k", j,k, 1d0*(j*(j+1) - k*(k-1))
-        !ENDIF
-        lm=min(j,jt)
-        IF (k<=-lm) THEN
+        IMPLICIT NONE
+        INTEGER, INTENT(IN) :: jt, j, k, l
+        REAL(8) :: arg
+
         lambda_minus = 0d0
-        ENDIF
-        IF ((k>-lm).AND.(k<=lm)) THEN
-        IF (l==1) THEN
-        lambda_minus = DSQRT(1d0*(jt*(jt+1) - k*(k-1)))
-        ELSE IF (l==2) THEN
-        lambda_minus = DSQRT(1d0*(j*(j+1) - k*(k-1)))
-        ENDIF
-        ENDIF
+
+        SELECT CASE (l)
+
+        CASE (1)   ! J_- acting on |J,K>
+                IF (k <= -jt .OR. k > jt) RETURN
+                arg = DBLE(jt*(jt+1) - k*(k-1))
+
+        CASE (2)   ! j_- acting on |j,k>
+                IF (k <= -j .OR. k > j) RETURN
+                arg = DBLE(j*(j+1) - k*(k-1))
+
+        CASE DEFAULT
+                RETURN
+
+        END SELECT
+
+        lambda_minus = DSQRT(MAX(0d0,arg))
+
 END FUNCTION lambda_minus
 
 REAL(8) FUNCTION W(k,k_prime,jt,j)
@@ -881,6 +897,205 @@ function wigner3j(l1,l2,l3,m1,m2,m3) result(res)
 
 
 
+
+
+
+
+
+    
+!===================Only for testing purposes========================
+
+SUBROUTINE test_wdd_5x5()
+        IMPLICIT NONE
+
+        INTEGER, PARAMETER :: n = 5
+        INTEGER :: i, j, info
+        INTEGER :: k1_list(n), k2_list(n)
+
+        REAL(8) :: Wmat(n,n)
+        REAL(8) :: Amat(n,n)
+        REAL(8) :: Acopy(n,n)
+        REAL(8) :: Aexpect(n,n)
+
+        REAL(8) :: eig(n)
+        REAL(8) :: eig_expect(n)
+        REAL(8) :: work(100)
+
+        REAL(8) :: symmetry_error
+        REAL(8) :: matrix_error
+        REAL(8) :: eigenvalue_error
+
+        EXTERNAL DSYEV
+
+        ! ---------------------------------------------------------
+        ! Basis ordering:
+        !
+        ! 1 = (2,-2,2, 2)
+        ! 2 = (2,-1,2, 1)
+        ! 3 = (2, 0,2, 0)
+        ! 4 = (2, 1,2,-1)
+        ! 5 = (2, 2,2,-2)
+        ! ---------------------------------------------------------
+
+        k1_list = (/ -2, -1, 0, 1, 2 /)
+        k2_list = (/  2,  1, 0,-1,-2 /)
+
+        Wmat = 0d0
+        Amat = 0d0
+
+        ! ---------------------------------------------------------
+        ! Construct Wdd matrix using the actual Wdd function
+        ! compiled into the SKVP module.
+        !
+        ! First channel labels  = row
+        ! Primed channel labels = column
+        ! ---------------------------------------------------------
+
+        DO i = 1, n
+                DO j = 1, n
+
+                        Wmat(i,j) = Wdd( &
+                                0,                    & ! Jtot
+                                2, k1_list(i),         & ! j1, k1
+                                2, k2_list(i),         & ! j2, k2
+                                2, k1_list(j),         & ! j1p, k1p
+                                2, k2_list(j))           ! j2p, k2p
+
+                ENDDO
+        ENDDO
+
+        ! ---------------------------------------------------------
+        ! The full angular operator multiplying 1/(2 mu_R R^2) is:
+        !
+        ! A = [j1(j1+1) + j2(j2+1)] I + Wdd
+        !
+        ! For j1=j2=2:
+        ! j1(j1+1)+j2(j2+1) = 6+6 = 12
+        ! ---------------------------------------------------------
+
+        Amat = Wmat
+
+        DO i = 1, n
+                Amat(i,i) = Amat(i,i) + 12d0
+        ENDDO
+
+        ! ---------------------------------------------------------
+        ! Exact expected matrix
+        ! ---------------------------------------------------------
+
+        Aexpect = 0d0
+
+        Aexpect(1,:) = (/ 4d0,  4d0,  0d0,  0d0, 0d0 /)
+        Aexpect(2,:) = (/ 4d0, 10d0,  6d0,  0d0, 0d0 /)
+        Aexpect(3,:) = (/ 0d0,  6d0, 12d0,  6d0, 0d0 /)
+        Aexpect(4,:) = (/ 0d0,  0d0,  6d0, 10d0, 4d0 /)
+        Aexpect(5,:) = (/ 0d0,  0d0,  0d0,  4d0, 4d0 /)
+
+        eig_expect = (/ 0d0, 2d0, 6d0, 12d0, 20d0 /)
+
+        ! ---------------------------------------------------------
+        ! Print basis
+        ! ---------------------------------------------------------
+
+        WRITE(*,*)
+        WRITE(*,*) '=============================================='
+        WRITE(*,*) '          Wdd 5x5 angular test'
+        WRITE(*,*) '=============================================='
+        WRITE(*,*)
+        WRITE(*,*) 'Basis index: j1  k1  j2  k2'
+
+        DO i = 1, n
+                WRITE(*,'(I5,4I5)') i, 2, k1_list(i), 2, k2_list(i)
+        ENDDO
+
+        ! ---------------------------------------------------------
+        ! Print Wdd alone
+        ! ---------------------------------------------------------
+
+        WRITE(*,*)
+        WRITE(*,*) 'Wdd matrix alone:'
+
+        DO i = 1, n
+                WRITE(*,'(5F12.6)') (Wmat(i,j), j=1,n)
+        ENDDO
+
+        ! ---------------------------------------------------------
+        ! Print full angular matrix A = 12I + Wdd
+        ! ---------------------------------------------------------
+
+        WRITE(*,*)
+        WRITE(*,*) 'Full angular matrix A = 12 I + Wdd:'
+
+        DO i = 1, n
+                WRITE(*,'(5F12.6)') (Amat(i,j), j=1,n)
+        ENDDO
+
+        ! ---------------------------------------------------------
+        ! Check Hermiticity/symmetry
+        ! ---------------------------------------------------------
+
+        symmetry_error = MAXVAL(ABS(Amat - TRANSPOSE(Amat)))
+        matrix_error   = MAXVAL(ABS(Amat - Aexpect))
+
+        WRITE(*,*)
+        WRITE(*,'(A,ES14.6)') 'Maximum symmetry error = ', symmetry_error
+        WRITE(*,'(A,ES14.6)') 'Maximum matrix error   = ', matrix_error
+
+        ! ---------------------------------------------------------
+        ! Diagonalize A using LAPACK DSYEV
+        !
+        ! DSYEV overwrites the input matrix, so use Acopy.
+        ! Eigenvalues are returned in ascending order.
+        ! ---------------------------------------------------------
+
+        Acopy = Amat
+
+        CALL DSYEV( &
+                'N',      & ! Do not calculate eigenvectors
+                'U',      & ! Use upper triangle
+                n,        &
+                Acopy,    &
+                n,        &
+                eig,      &
+                work,     &
+                SIZE(work), &
+                info)
+
+        IF (info /= 0) THEN
+                WRITE(*,*) 'ERROR: DSYEV failed, info = ', info
+                STOP 1
+        ENDIF
+
+        eigenvalue_error = MAXVAL(ABS(eig - eig_expect))
+
+        WRITE(*,*)
+        WRITE(*,*) 'Calculated eigenvalues:'
+        WRITE(*,'(5F12.6)') eig
+
+        WRITE(*,*) 'Expected eigenvalues:'
+        WRITE(*,'(5F12.6)') eig_expect
+
+        WRITE(*,'(A,ES14.6)') 'Maximum eigenvalue error = ', &
+                              eigenvalue_error
+
+        WRITE(*,*)
+
+        IF (symmetry_error < 1d-12 .AND. &
+            matrix_error   < 1d-12 .AND. &
+            eigenvalue_error < 1d-10) THEN
+
+                WRITE(*,*) 'PASS: Wdd 5x5 test passed.'
+
+        ELSE
+
+                WRITE(*,*) 'FAIL: Wdd 5x5 test failed.'
+
+        ENDIF
+
+        WRITE(*,*) '=============================================='
+        WRITE(*,*)
+
+END SUBROUTINE test_wdd_5x5
 
   End MODULE AtomDiatomskvp
 !

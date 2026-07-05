@@ -1,0 +1,26 @@
+
+# Fortran build files
+*.o
+*.mod
+*.smod
+
+# executable files
+skvp_AtomDiatom
+*.x
+
+# logs and run outputs
+*.log
+runlogs/
+slurm-*.out
+*.out
+*.err
+
+# generated cache/data files
+matrices.bin
+previous_calc.dat
+proba.dat
+A_cache*.dat
+fort.*
+
+# macOS
+.DS_Store
