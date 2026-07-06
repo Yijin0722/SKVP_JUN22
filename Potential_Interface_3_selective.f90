@@ -43,18 +43,18 @@ MODULE Potential_Interface
 !
 !       Note: with this file's convention the third index is m, so a term
 !       like (3,3,3) is allowed, while (3,3,4) is not allowed.
-        INTEGER, PARAMETER :: lambda1_min_default = 4
+        INTEGER, PARAMETER :: lambda1_min_default = 0
         INTEGER, PARAMETER :: lambda1_max_default = 4  !16
-        INTEGER, PARAMETER :: lambda2_min_default = 4
+        INTEGER, PARAMETER :: lambda2_min_default = 0
         INTEGER, PARAMETER :: lambda2_max_default = 4 !16
-        INTEGER, PARAMETER :: m_min_default       = 4
+        INTEGER, PARAMETER :: m_min_default       = 0
         INTEGER, PARAMETER :: m_max_default       = 4 !10
 
 !
 !       Gaussian quadrature parameters for angular projection
 !       -----------------------------------------------------
-        INTEGER, PARAMETER :: nx_A   = 24
-        INTEGER, PARAMETER :: nphi_A = 24
+        INTEGER, PARAMETER :: nx_A   = 23
+        INTEGER, PARAMETER :: nphi_A = 23
 
         REAL(dp), PARAMETER :: pi_A = 3.1415926535897932384626433832795_dp
 

@@ -27,17 +27,24 @@ PROGRAM skvpAtomDiatom
  IMPLICIT NONE
 !-------------
 !
- INTEGER :: i, j
+ INTEGER :: i, j, q
  INTEGER :: t
  INTEGER :: j1, j2, j1low, j2low
  INTEGER :: k1, k2, k1range, k2range
+ INTEGER :: incoming_0000_idx, incoming_2020_idx, final_open_idx
  INTEGER                                  :: step, n_steps
  INTEGER, PARAMETER                       :: proba_0000_unit = 100
  INTEGER, PARAMETER                       :: proba_all_unit = 101
  INTEGER, PARAMETER                       :: proba_2020_unit = 102
+ INTEGER, PARAMETER                       :: proba_0000_table_unit = 103
+ INTEGER, PARAMETER                       :: proba_2020_table_unit = 104
 
  REAL(8)                                  :: tm1, tm2, pas_x, yy=0.020d0
  REAL(8)                                  :: x1, x2              !, DLAMCH
+ REAL(8)                                  :: probability
+ LOGICAL                                  :: proba_0000_table_header_written
+ LOGICAL                                  :: proba_2020_table_header_written
+ CHARACTER(LEN=64)                       :: channel_label
  !COMPLEX(8)                               :: varc
  !REAL(8), ALLOCATABLE, DIMENSION(:)       :: var
  !COMPLEX(8), ALLOCATABLE, DIMENSION(:)    :: biatx
@@ -64,6 +71,10 @@ CALL calculate_RMS_potential_expansion
         OPEN (proba_0000_unit,file='praba_0000.dat',status='unknown',action='write',position='append')
         OPEN (proba_all_unit,file='proba_all.dat',status='unknown', action='write',position='append')
         OPEN (proba_2020_unit,file='praba_2020.dat',status='unknown',action='write',position='append')
+        OPEN (proba_0000_table_unit,file='praba_0000_table.dat',status='replace',action='write')
+        OPEN (proba_2020_table_unit,file='praba_2020_table.dat',status='replace',action='write')
+        proba_0000_table_header_written = .FALSE.
+        proba_2020_table_header_written = .FALSE.
 !
 !
 ! Call for input paramaters reading routine
@@ -223,13 +234,110 @@ CALL calculate_RMS_potential_expansion
         CALL CrossSection
 
 !
+        incoming_0000_idx = 0
+        incoming_2020_idx = 0
+        DO i = 1, n_open
+                q = open_idx(i)
+                IF (quant_mat(1,q) == 0 .AND. quant_mat(2,q) == 0 .AND. &
+                    quant_mat(3,q) == 0 .AND. quant_mat(4,q) == 0) THEN
+                        incoming_0000_idx = i
+                ENDIF
+                IF (quant_mat(1,q) == 2 .AND. quant_mat(2,q) == 0 .AND. &
+                    quant_mat(3,q) == 2 .AND. quant_mat(4,q) == 0) THEN
+                        incoming_2020_idx = i
+                ENDIF
+        ENDDO
+
         WRITE(6,*) 'PROBABILITIES at SOME ENERGY - ', step
         WRITE(6,*) 'incoming (0,0,0,0)'
-        CALL WriteIncomingProbabilityRow(6, 0, 0, 0, 0)
+        IF (incoming_0000_idx > 0) THEN
+                WRITE(6,'(16E15.7)') E*27.211399d0, &
+                        ((ABS(Smat(incoming_0000_idx,j))**2.D0), j=1,n_open)
+        ELSE
+                WRITE(6,'(16E15.7)') E*27.211399d0, (0d0, j=1,n_open)
+        ENDIF
+
         WRITE(6,*) 'incoming (2,0,2,0)'
-        CALL WriteIncomingProbabilityRow(6, 2, 0, 2, 0)
-        CALL WriteIncomingProbabilityRow(proba_0000_unit, 0, 0, 0, 0)
-        CALL WriteIncomingProbabilityRow(proba_2020_unit, 2, 0, 2, 0)
+        IF (incoming_2020_idx > 0) THEN
+                WRITE(6,'(16E15.7)') E*27.211399d0, &
+                        ((ABS(Smat(incoming_2020_idx,j))**2.D0), j=1,n_open)
+        ELSE
+                WRITE(6,'(16E15.7)') E*27.211399d0, (0d0, j=1,n_open)
+        ENDIF
+
+        IF (incoming_0000_idx > 0) THEN
+                WRITE(proba_0000_unit,'(16E15.7)') E*27.211399d0, &
+                        ((ABS(Smat(incoming_0000_idx,j))**2.D0), j=1,n_open)
+        ELSE
+                WRITE(proba_0000_unit,'(16E15.7)') E*27.211399d0, (0d0, j=1,n_open)
+        ENDIF
+
+        IF (incoming_2020_idx > 0) THEN
+                WRITE(proba_2020_unit,'(16E15.7)') E*27.211399d0, &
+                        ((ABS(Smat(incoming_2020_idx,j))**2.D0), j=1,n_open)
+        ELSE
+                WRITE(proba_2020_unit,'(16E15.7)') E*27.211399d0, (0d0, j=1,n_open)
+        ENDIF
+
+        IF (.NOT. proba_0000_table_header_written) THEN
+                WRITE(proba_0000_table_unit,'(A)', ADVANCE='NO') 'Energy_eV'
+                DO q = 1, ncf
+                        WRITE(channel_label,'("(",I0,",",I0,",",I0,",",I0,")")') &
+                                quant_mat(1,q), quant_mat(2,q), quant_mat(3,q), quant_mat(4,q)
+                        WRITE(proba_0000_table_unit,'(1X,A)', ADVANCE='NO') TRIM(channel_label)
+                ENDDO
+                WRITE(proba_0000_table_unit,*)
+                proba_0000_table_header_written = .TRUE.
+        ENDIF
+
+        IF (.NOT. proba_2020_table_header_written) THEN
+                WRITE(proba_2020_table_unit,'(A)', ADVANCE='NO') 'Energy_eV'
+                DO q = 1, ncf
+                        WRITE(channel_label,'("(",I0,",",I0,",",I0,",",I0,")")') &
+                                quant_mat(1,q), quant_mat(2,q), quant_mat(3,q), quant_mat(4,q)
+                        WRITE(proba_2020_table_unit,'(1X,A)', ADVANCE='NO') TRIM(channel_label)
+                ENDDO
+                WRITE(proba_2020_table_unit,*)
+                proba_2020_table_header_written = .TRUE.
+        ENDIF
+
+        WRITE(proba_0000_table_unit,'(ES15.7)', ADVANCE='NO') E*27.211399d0
+        DO q = 1, ncf
+                probability = 0d0
+                IF (incoming_0000_idx > 0) THEN
+                        final_open_idx = 0
+                        DO j = 1, n_open
+                                IF (open_idx(j) == q) THEN
+                                        final_open_idx = j
+                                        EXIT
+                                ENDIF
+                        ENDDO
+                        IF (final_open_idx > 0) THEN
+                                probability = ABS(Smat(incoming_0000_idx,final_open_idx))**2.D0
+                        ENDIF
+                ENDIF
+                WRITE(proba_0000_table_unit,'(1X,ES15.7)', ADVANCE='NO') probability
+        ENDDO
+        WRITE(proba_0000_table_unit,*)
+
+        WRITE(proba_2020_table_unit,'(ES15.7)', ADVANCE='NO') E*27.211399d0
+        DO q = 1, ncf
+                probability = 0d0
+                IF (incoming_2020_idx > 0) THEN
+                        final_open_idx = 0
+                        DO j = 1, n_open
+                                IF (open_idx(j) == q) THEN
+                                        final_open_idx = j
+                                        EXIT
+                                ENDIF
+                        ENDDO
+                        IF (final_open_idx > 0) THEN
+                                probability = ABS(Smat(incoming_2020_idx,final_open_idx))**2.D0
+                        ENDIF
+                ENDIF
+                WRITE(proba_2020_table_unit,'(1X,ES15.7)', ADVANCE='NO') probability
+        ENDDO
+        WRITE(proba_2020_table_unit,*)
 
 
         DO i = 1, n_open
@@ -338,6 +446,8 @@ CALL calculate_RMS_potential_expansion
 CLOSE(proba_0000_unit)
 CLOSE(proba_all_unit)
 CLOSE(proba_2020_unit)
+CLOSE(proba_0000_table_unit)
+CLOSE(proba_2020_table_unit)
 
 !Testing for angular momentum component
 !CALL test_wdd_5x5()
@@ -349,51 +459,6 @@ CLOSE(proba_2020_unit)
 !*********************************************************************************************
 !
 !
-!
-!*********************************************************************************************
-!*********************************************************************************************
-!*********************************************************************************************
-!
- SUBROUTINE WriteIncomingProbabilityRow(out_unit, target_j1, target_k1, target_j2, target_k2)
-!
-!*********************************************************************************************
-!
-! Writes one probability row for the requested incoming open channel.
-!
-!=============================================================================================
-!
-        USE AtomDiatomskvp
-        USE generateparameters
-
-        IMPLICIT NONE
-
-        INTEGER, INTENT(IN) :: out_unit
-        INTEGER, INTENT(IN) :: target_j1, target_k1, target_j2, target_k2
-        INTEGER :: i, j, q, incoming_idx
-
-        incoming_idx = 0
-
-        DO i = 1, n_open
-                q = open_idx(i)
-                IF (quant_mat(1,q) == target_j1 .AND. &
-                    quant_mat(2,q) == target_k1 .AND. &
-                    quant_mat(3,q) == target_j2 .AND. &
-                    quant_mat(4,q) == target_k2) THEN
-                        incoming_idx = i
-                        EXIT
-                ENDIF
-        ENDDO
-
-        IF (incoming_idx > 0) THEN
-                WRITE(out_unit,'(16E15.7)') E*27.211399d0, &
-                        ((ABS(Smat(incoming_idx,j))**2.D0), j=1,n_open)
-        ELSE
-                WRITE(out_unit,'(16E15.7)') E*27.211399d0, (0d0, j=1,n_open)
-        ENDIF
-
- END SUBROUTINE WriteIncomingProbabilityRow
-!
-!=============================================================================================
 !
 !*********************************************************************************************
 !*********************************************************************************************
@@ -947,7 +1012,7 @@ PRINT*, '==============================='
         REAL(8), ALLOCATABLE :: sum_array(:), workx(:)
         REAL(8), ALLOCATABLE :: rhs_re(:,:), rhs_im(:,:), modul(:,:)
         REAL(8) :: work_query(1)
-        REAL(8) :: max_sym_error
+   
 
         COMPLEX(8), ALLOCATABLE :: solution_M0(:,:)
         COMPLEX(8), ALLOCATABLE :: Bsub(:,:), Csub(:,:), Smat_st(:,:)
@@ -1112,9 +1177,8 @@ PRINT*, '==============================='
         PRINT*, "Checking probabilities sum to one: ", sum_array(:)
         PRINT*, ' '
 
-        max_sym_error = MAXVAL(ABS(Smat - TRANSPOSE(Smat)))
 
-        PRINT *, 'max |S-S^T| = ', max_sym_error
+       
         ! Adding data to output file
         ! IF (n_open >= 2) THEN
         !         open(unit=10, file="2_0.txt", status='unknown', position='append', action='write')
