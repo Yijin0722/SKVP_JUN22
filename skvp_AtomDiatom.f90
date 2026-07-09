@@ -243,6 +243,7 @@ CALL profile_end('Calculate RMS', prof_t, prof_rss)
 !-----------------------------------------
         CALL CrossSection
 
+        print*, "Size of mat_M: ",dim_x * ncf, " x ",dim_x * ncf
 !
         incoming_0000_idx = 0
         incoming_2020_idx = 0
@@ -762,7 +763,6 @@ CLOSE(proba_2020_table_unit)
 
         CALL MOVE_ALLOC(M_V, mat_M) 
 
-        print*, "Size of mat_M: ", dim_x * ncf, " x ", dim_x * ncf
 
         ALLOCATE(mat_M0(1:N,1:n_open), STAT=istatus)
         ALLOCATE(mat_M00(1:n_open,1:n_open), &

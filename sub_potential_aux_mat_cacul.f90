@@ -167,15 +167,26 @@ SUBROUTINE build_BAM_rs
         INTEGER :: i, i_prime
         INTEGER :: n, n_prime
         INTEGER :: l, ipot
-        INTEGER :: q
+        INTEGER :: q, q_max_save
         REAL(8) :: xm, xr, dx, sxv
-        REAL(8) :: prof_t, prof_rss
-        COMPLEX(8) :: sxv0
+        REAL(8) :: prof_t, prof_rss, prof_t_BAM_rs, prof_rss_BAM_rs
+        COMPLEX(8) :: sxv0, sxv1
+
+        COMPLEX(8), ALLOCATABLE :: u0_save(:,:,:,:)
+        COMPLEX(8) :: up_n, up_np, um_n, um_np
+        REAL(8) :: wq, Aplus, Aminus
+
+        REAL(8), ALLOCATABLE :: bsp_save(:,:,:,:)
+        REAL(8), ALLOCATABLE :: inv_sqrt_norm(:)
+        REAL(8) :: bplus, bminus
+
 
         CALL profile_begin(prof_t, prof_rss)
         CALL read_A_cache(knots_x, gq_root_x, ngqp_x)
         CALL profile_end('read_A_cache', prof_t, prof_rss)
-        CALL profile_begin(prof_t, prof_rss)
+        CALL profile_begin(prof_t_BAM_rs, prof_rss_BAM_rs)
+
+        call profile_begin(prof_t, prof_rss)
 !
 !       Allocate BAM_r
 !       --------------
@@ -220,17 +231,149 @@ SUBROUTINE build_BAM_rs
         ENDDO
         ENDDO
 
+        call profile_end('Build BAM_r', prof_t, prof_rss)
+!
+!       Build BAM_r0: closed-open radial potential block
+!       ------------------------------------------------
+!
+!       BAM_r0(ipot,i,n_prime)
+!       =
+!       Int dR B_i(R) A_ipot(R) u0_n_prime(R) / sqrt(norm(i))
+!
+!       u0(n,R) is complex:
+!
+!       u0(n,R) = exp(-i*k_n*R) * h(R) * sqrt(mu_R/k_n)
+!
+!       We cache both u0(n,R) and bsp_x(i,R), because neither depends on ipot.
+!
+
+!
+!       Cache u0(n,R) on all radial Gauss points used by BAM_r0 and BAM_r00/r10
+!       ----------------------------------------------------------------------
+!
+!       u0_save(n,q,l,1) = u0(n, xm + dx)
+!       u0_save(n,q,l,2) = u0(n, xm - dx)
+!
+
+        q_max_save = pbasst(1)%pb_nbr + pbasst(1)%pb_pa1 - 1
+
+        CALL profile_begin(prof_t, prof_rss)
+
+        IF (ALLOCATED(u0_save)) THEN
+                DEALLOCATE(u0_save, STAT = istatus)
+        ENDIF
+
+        ALLOCATE(u0_save(1:n_open, 1:q_max_save, 1:ngqp_x/2, 1:2), STAT = istatus)
+
+        IF (istatus /= 0) THEN
+                PRINT*, 'Error: allocation failed for u0_save in build_BAM_rs.'
+                STOP
+        ENDIF
+
+        u0_save = (0d0, 0d0)
+
+        DO q = 1, q_max_save
+
+                xm = 0.5d0 * (knots_x(q+1) + knots_x(q))
+                xr = 0.5d0 * (knots_x(q+1) - knots_x(q))
+
+                DO l = 1, ngqp_x/2
+
+                        dx = xr * gq_root_x(l+ngqp_x/2)
+
+                        DO n = 1, n_open
+                                u0_save(n,q,l,1) = u0(n, xm+dx)
+                                u0_save(n,q,l,2) = u0(n, xm-dx)
+                        ENDDO
+
+                ENDDO
+
+        ENDDO
+
+        CALL profile_end('Build u0_save', prof_t, prof_rss)
+
+
+!
+!       Cache B-spline basis values used by BAM_r0
+!       ------------------------------------------
+!
+!       bsp_save(i,q,l,1) = bsp_x(i, xm + dx)
+!       bsp_save(i,q,l,2) = bsp_x(i, xm - dx)
+!
+!       These values depend only on i, q, l, not on ipot or n_prime.
+!
+
+        CALL profile_begin(prof_t, prof_rss)
+
+        IF (ALLOCATED(bsp_save)) THEN
+                DEALLOCATE(bsp_save, STAT = istatus)
+        ENDIF
+
+        ALLOCATE(bsp_save(1:pbasst(1)%pb_nbr, 1:q_max_save, 1:ngqp_x/2, 1:2), STAT = istatus)
+
+        IF (istatus /= 0) THEN
+                PRINT*, 'Error: allocation failed for bsp_save in build_BAM_rs.'
+                STOP
+        ENDIF
+
+        bsp_save = 0d0
+
+        DO i = 1, pbasst(1)%pb_nbr
+
+                DO q = i, i+pbasst(1)%pb_pa1-1
+
+                        xm = 0.5d0 * (knots_x(q+1) + knots_x(q))
+                        xr = 0.5d0 * (knots_x(q+1) - knots_x(q))
+
+                        DO l = 1, ngqp_x/2
+
+                                dx = xr * gq_root_x(l+ngqp_x/2)
+
+                                bsp_save(i,q,l,1) = bsp_x(i, xm+dx)
+                                bsp_save(i,q,l,2) = bsp_x(i, xm-dx)
+
+                        ENDDO
+
+                ENDDO
+
+        ENDDO
+
+        CALL profile_end('Build bsp_save', prof_t, prof_rss)
+
+
+!
+!       Cache normalization factor 1/sqrt(norm(i))
+!       ------------------------------------------
+!
+
+        IF (ALLOCATED(inv_sqrt_norm)) THEN
+                DEALLOCATE(inv_sqrt_norm, STAT = istatus)
+        ENDIF
+
+        ALLOCATE(inv_sqrt_norm(1:pbasst(1)%pb_nbr), STAT = istatus)
+
+        IF (istatus /= 0) THEN
+                PRINT*, 'Error: allocation failed for inv_sqrt_norm in build_BAM_rs.'
+                STOP
+        ENDIF
+
+        DO i = 1, pbasst(1)%pb_nbr
+                inv_sqrt_norm(i) = 1d0 / DSQRT(norm(i))
+        ENDDO
+
+
 !
 !       Allocate BAM_r0
 !       ---------------
-!       Important:
-!       u0(n,R) is COMPLEX(8), so BAM_r0 must be COMPLEX(8).
 !
+
+        CALL profile_begin(prof_t, prof_rss)
+
         IF (ALLOCATED(BAM_r0)) THEN
                 DEALLOCATE(BAM_r0, STAT = istatus)
         ENDIF
 
-        ALLOCATE(BAM_r0(1:n_pot,1:pbasst(1)%pb_nbr,1:n_open), STAT = istatus)
+        ALLOCATE(BAM_r0(1:n_pot, 1:pbasst(1)%pb_nbr, 1:n_open), STAT = istatus)
 
         IF (istatus /= 0) THEN
                 PRINT*, 'Error: allocation failed for BAM_r0 in build_BAM_rs.'
@@ -239,49 +382,63 @@ SUBROUTINE build_BAM_rs
 
         BAM_r0 = (0d0, 0d0)
 
+
 !
-!       Calculate closed-open radial potential matrix:
+!       Build BAM_r0 using cached u0_save and bsp_save
+!       ----------------------------------------------
 !
-!       BAM_r0(ipot,i,n_prime)
-!       =
-!       Int dR B_i(R) A_ipot(R) u0_n_prime(R)
-!       / sqrt(norm(i))
-!
-!       u0 already contains:
-!       exp(-i*k*R) * h(R) * sqrt(mu_R/k)
-!
-        BAM_r0 = (0d0, 0d0)
 
         DO i = 1, pbasst(1)%pb_nbr
         DO n_prime = 1, n_open
 
                 DO q = i, i+pbasst(1)%pb_pa1-1
+
                         xm = 0.5d0 * (knots_x(q+1) + knots_x(q))
                         xr = 0.5d0 * (knots_x(q+1) - knots_x(q))
 
                         DO ipot = 1, n_pot
+
                                 sxv0 = (0d0, 0d0)
 
                                 DO l = 1, ngqp_x/2
-                                        dx = xr * gq_root_x(l+ngqp_x/2)
 
-                                        sxv0 = sxv0 + gq_weight_x(l+ngqp_x/2) * &
-                                                ( bsp_x(i,xm+dx) * A_cache(ipot,q,l,1) * u0(n_prime,xm+dx) + &
-                                                bsp_x(i,xm-dx) * A_cache(ipot,q,l,2) * u0(n_prime,xm-dx) )
+                                        wq = gq_weight_x(l+ngqp_x/2)
+
+                                        Aplus  = A_cache(ipot,q,l,1)
+                                        Aminus = A_cache(ipot,q,l,2)
+
+                                        bplus  = bsp_save(i,q,l,1)
+                                        bminus = bsp_save(i,q,l,2)
+
+                                        up_np = u0_save(n_prime,q,l,1)
+                                        um_np = u0_save(n_prime,q,l,2)
+
+                                        sxv0 = sxv0 + wq * &
+                                                ( bplus  * Aplus  * up_np + &
+                                                  bminus * Aminus * um_np )
+
                                 ENDDO
 
                                 BAM_r0(ipot,i,n_prime) = BAM_r0(ipot,i,n_prime) + &
-                                        sxv0 * xr / DSQRT(norm(i))
+                                        sxv0 * xr * inv_sqrt_norm(i)
+
                         ENDDO
+
                 ENDDO
 
         ENDDO
         ENDDO
 
+        CALL profile_end('Build BAM_r0', prof_t, prof_rss)
 
-        !
+
+!
 !       Allocate BAM_r00 and BAM_r10
 !       ----------------------------
+!
+
+        CALL profile_begin(prof_t, prof_rss)
+
         IF (ALLOCATED(BAM_r00)) THEN
                 DEALLOCATE(BAM_r00, STAT = istatus)
         ENDIF
@@ -290,14 +447,14 @@ SUBROUTINE build_BAM_rs
                 DEALLOCATE(BAM_r10, STAT = istatus)
         ENDIF
 
-        ALLOCATE(BAM_r00(1:n_pot,1:n_open,1:n_open), STAT = istatus)
+        ALLOCATE(BAM_r00(1:n_pot, 1:n_open, 1:n_open), STAT = istatus)
 
         IF (istatus /= 0) THEN
                 PRINT*, 'Error: allocation failed for BAM_r00 in build_BAM_rs.'
                 STOP
         ENDIF
 
-        ALLOCATE(BAM_r10(1:n_pot,1:n_open,1:n_open), STAT = istatus)
+        ALLOCATE(BAM_r10(1:n_pot, 1:n_open, 1:n_open), STAT = istatus)
 
         IF (istatus /= 0) THEN
                 PRINT*, 'Error: allocation failed for BAM_r10 in build_BAM_rs.'
@@ -307,44 +464,80 @@ SUBROUTINE build_BAM_rs
         BAM_r00 = (0d0, 0d0)
         BAM_r10 = (0d0, 0d0)
 
+
+!
+!       Build BAM_r00 and BAM_r10 using cached u0 values
+!       -------------------------------------------------
+!
+
         DO n = 1, n_open
         DO n_prime = 1, n_open
 
                 DO q = pbasst(1)%pb_pa1, pbasst(1)%pb_nbr
+
                         xm = 0.5d0 * (knots_x(q+1) + knots_x(q))
                         xr = 0.5d0 * (knots_x(q+1) - knots_x(q))
 
                         DO ipot = 1, n_pot
+
                                 sxv0 = (0d0, 0d0)
+                                sxv1 = (0d0, 0d0)
 
                                 DO l = 1, ngqp_x/2
-                                        dx = xr * gq_root_x(l+ngqp_x/2)
 
-                                        sxv0 = sxv0 + gq_weight_x(l+ngqp_x/2) * &
-                                                ( u0(n,xm+dx) * A_cache(ipot,q,l,1) * u0(n_prime,xm+dx) + &
-                                                        u0(n,xm-dx) * A_cache(ipot,q,l,2) * u0(n_prime,xm-dx) )
+                                        wq = gq_weight_x(l+ngqp_x/2)
+
+                                        Aplus  = A_cache(ipot,q,l,1)
+                                        Aminus = A_cache(ipot,q,l,2)
+
+                                        up_n  = u0_save(n,       q, l, 1)
+                                        up_np = u0_save(n_prime, q, l, 1)
+
+                                        um_n  = u0_save(n,       q, l, 2)
+                                        um_np = u0_save(n_prime, q, l, 2)
+
+                                        sxv0 = sxv0 + wq * &
+                                                ( up_n * Aplus * up_np + &
+                                                  um_n * Aminus * um_np )
+
+                                        sxv1 = sxv1 + wq * &
+                                                ( CONJG(up_n) * Aplus * up_np + &
+                                                  CONJG(um_n) * Aminus * um_np )
+
                                 ENDDO
 
                                 BAM_r00(ipot,n,n_prime) = BAM_r00(ipot,n,n_prime) + sxv0 * xr
 
-                                sxv0 = (0d0, 0d0)
+                                BAM_r10(ipot,n,n_prime) = BAM_r10(ipot,n,n_prime) + sxv1 * xr
 
-                                DO l = 1, ngqp_x/2
-                                        dx = xr * gq_root_x(l+ngqp_x/2)
-
-                                        sxv0 = sxv0 + gq_weight_x(l+ngqp_x/2) * &
-                                                        ( CONJG(u0(n,xm+dx)) * A_cache(ipot,q,l,1) * u0(n_prime,xm+dx) + &
-                                                        CONJG(u0(n,xm-dx)) * A_cache(ipot,q,l,2) * u0(n_prime,xm-dx) )
-                                ENDDO
-
-                                BAM_r10(ipot,n,n_prime) = BAM_r10(ipot,n,n_prime) + sxv0 * xr
                         ENDDO
+
                 ENDDO
 
         ENDDO
         ENDDO
 
-        CALL profile_end('Build BAM_r/0/00/10/*', prof_t, prof_rss)
+        CALL profile_end('Build BAM_r00/10', prof_t, prof_rss)
+
+
+!
+!       Release temporary caches
+!       ------------------------
+!
+
+        IF (ALLOCATED(u0_save)) THEN
+                DEALLOCATE(u0_save, STAT = istatus)
+        ENDIF
+
+        IF (ALLOCATED(bsp_save)) THEN
+                DEALLOCATE(bsp_save, STAT = istatus)
+        ENDIF
+
+        IF (ALLOCATED(inv_sqrt_norm)) THEN
+                DEALLOCATE(inv_sqrt_norm, STAT = istatus)
+        ENDIF
+
+        CALL profile_end('Build BAM_r/0/00/10/*', prof_t_BAM_rs, prof_rss_BAM_rs)
 
 END SUBROUTINE build_BAM_rs
 !
@@ -454,5 +647,4 @@ END SUBROUTINE build_BAM_thetas
 !
 !*********************************************************************************************
 !=============================================================================================
-
 
