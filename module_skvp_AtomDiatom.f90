@@ -63,26 +63,26 @@ INTEGER, allocatable, dimension(:) :: open_idx
 !*********************************************************************************************
 !*********************************************************************************************
 !
- REAL(8) FUNCTION profile_wall_seconds()
+ REAL(8) FUNCTION profile_cpu_seconds()
 !
 !*********************************************************************************************
 !
-!       Wall-clock timer used by lightweight profiling markers.
+!       CPU timer used by lightweight profiling markers.
+!
+!       This measures CPU time, not wall-clock time.
+!       For multi-threaded/OpenMP runs, CPU time may be larger than wall time.
 !
 !=============================================================================================
 !
-        INTEGER :: count, count_rate, count_max
+        REAL(8) :: t_cpu
 
-        CALL SYSTEM_CLOCK(count, count_rate, count_max)
+        CALL CPU_TIME(t_cpu)
 
-        IF (count_rate > 0) THEN
-                profile_wall_seconds = DBLE(count) / DBLE(count_rate)
-        ELSE
-                profile_wall_seconds = 0d0
-        ENDIF
+        profile_cpu_seconds = t_cpu
 !
 !=============================================================================================
- END FUNCTION profile_wall_seconds
+ END FUNCTION profile_cpu_seconds
+!=============================================================================================
 !=============================================================================================
 !
 !
@@ -138,7 +138,7 @@ INTEGER, allocatable, dimension(:) :: open_idx
 !
         REAL(8), INTENT(OUT) :: start_time, start_rss_mb
 
-        start_time   = profile_wall_seconds()
+        start_time   = profile_cpu_seconds()
         start_rss_mb = profile_rss_mb()
 
  END SUBROUTINE profile_begin
@@ -155,19 +155,19 @@ INTEGER, allocatable, dimension(:) :: open_idx
         REAL(8), INTENT(IN) :: start_time, start_rss_mb
         REAL(8) :: end_time, end_rss_mb, elapsed, delta_rss
 
-        end_time   = profile_wall_seconds()
+        end_time   = profile_cpu_seconds()
         end_rss_mb = profile_rss_mb()
         elapsed    = end_time - start_time
 
         IF (start_rss_mb >= 0d0 .AND. end_rss_mb >= 0d0) THEN
                 delta_rss = end_rss_mb - start_rss_mb
                 WRITE(6,'(A,1X,A,1X,A,F12.3,1X,A,F12.3,1X,A,F12.3,1X,A,ES14.6,1X,A,I8,1X,A,I8,1X,A,I8)') &
-                        'PROF', 'stage='//TRIM(label), 'time_s=', elapsed, &
+                        'PROF', 'stage='//TRIM(label), 'cpu_time_s=', elapsed, &
                         'rss_mb=', end_rss_mb, 'delta_mb=', delta_rss, &
                         'E_Ha=', E, 'Jtot=', Jtot, 'ncf=', ncf, 'n_open=', n_open
         ELSE
                 WRITE(6,'(A,1X,A,1X,A,F12.3,1X,A,1X,A,ES14.6,1X,A,I8,1X,A,I8,1X,A,I8)') &
-                        'PROF', 'stage='//TRIM(label), 'time_s=', elapsed, &
+                        'PROF', 'stage='//TRIM(label), 'cpu_time_s=', elapsed, &
                         'rss_mb=NA', 'E_Ha=', E, 'Jtot=', Jtot, &
                         'ncf=', ncf, 'n_open=', n_open
         ENDIF

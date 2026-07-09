@@ -22,7 +22,7 @@ SUBROUTINE potential_mat_calcul
 !       Total closed-channel matrix dimension
 !       -------------------------------------
         Ntot = dim_x * ncf
-
+        
 !
 !       Safety check
 !       ------------
