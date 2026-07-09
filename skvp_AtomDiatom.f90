@@ -147,6 +147,8 @@ CALL profile_end('Calculate RMS', prof_t, prof_rss)
         !!!ncf = (((2*Jtot + 1)*pbasst(2)%pb_nbr)/2)+1
         ! Compute ncf
 
+print *, "==============================================================="
+
         CALL profile_begin(prof_t, prof_rss)
         ncf=0
         do j1=0, pbasst(2)%pb_nbr, 2 !=> Revisit later
