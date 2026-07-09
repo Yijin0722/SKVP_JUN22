@@ -39,7 +39,9 @@ PROGRAM skvpAtomDiatom
  INTEGER, PARAMETER                       :: proba_0000_table_unit = 103
  INTEGER, PARAMETER                       :: proba_2020_table_unit = 104
 
- REAL(8)                                  :: tm1, tm2, pas_x, yy=0.020d0
+	 REAL(8)                                  :: tm1, tm2, pas_x, yy=0.020d0
+	 REAL(8)                                  :: prof_t, prof_rss
+	 REAL(8)                                  :: energy_prof_t, energy_prof_rss
  REAL(8)                                  :: x1, x2              !, DLAMCH
  REAL(8)                                  :: probability
  LOGICAL                                  :: proba_0000_table_header_written
@@ -60,7 +62,9 @@ CALL read_input
 
 CALL build_potential_index
 
+CALL profile_begin(prof_t, prof_rss)
 CALL calculate_RMS_potential_expansion
+CALL profile_end('Calculate RMS', prof_t, prof_rss)
 
                 DO t = 1, n_pot
                 WRITE(*,'(4I6)') t, pot_mat(1,t), pot_mat(2,t), pot_mat(3,t)
@@ -120,13 +124,13 @@ CALL calculate_RMS_potential_expansion
                 WRITE(6,'(I5,4I6)') i, quant_mat(1,i), quant_mat(2,i), quant_mat(3,i), quant_mat(4,i)
         ENDDO
 
-!
 ! Calculate the number of steps (using Nearest Integer to be safe) in the energy range and loop
 !----------------------------------------------------------------------------------------------
         n_steps = nint((en_final - en_start) / en_step)
         ! Energy loop -- loopnmax = 1001
         DO step = 0, n_steps
         E = en_start + (real(step,8)*en_step)
+        CALL profile_begin(energy_prof_t, energy_prof_rss)
         !E = dble(loopn-1)*(0.0025d0/10d0)
         !!!E = 0.000d0 + dble(loopn-1)*(0.040d0/1000d0)
         !E = 0.0d0 + dble(loopnmax-loopn+1)*(0.0367493d0/10d0)
@@ -143,6 +147,7 @@ CALL calculate_RMS_potential_expansion
         !!!ncf = (((2*Jtot + 1)*pbasst(2)%pb_nbr)/2)+1
         ! Compute ncf
 
+        CALL profile_begin(prof_t, prof_rss)
         ncf=0
         do j1=0, pbasst(2)%pb_nbr, 2 !=> Revisit later
                 j1low=min(j1,pbasst(2)%pb_pa1)
@@ -159,6 +164,7 @@ CALL calculate_RMS_potential_expansion
                         enddo
                 enddo
         enddo
+
         ! Compute quant_mat
         ALLOCATE(quant_mat(4,ncf))
         ncf = 0
@@ -181,6 +187,8 @@ CALL calculate_RMS_potential_expansion
                         enddo
                 enddo
         enddo
+
+        CALL profile_end('Build_quant_mat', prof_t, prof_rss)
 
 
         ! Print parameters
@@ -223,7 +231,9 @@ CALL calculate_RMS_potential_expansion
         !PRINT*, quant_mat(1, 1:10)
         !PRINT*, quant_mat(2, 1:10)
 !
+        CALL profile_begin(prof_t, prof_rss)
         CALL solve_target_levels
+        CALL profile_end('solve_target_levels', prof_t, prof_rss)
         x1 = pbasst(1)%pb_min   
         x2 = pbasst(1)%pb_max
         ALLOCATE(x(1:ngqp_x), wx(1:ngqp_x), STAT = istatus) 
@@ -340,17 +350,17 @@ CALL calculate_RMS_potential_expansion
         WRITE(proba_2020_table_unit,*)
 
 
-        DO i = 1, n_open
-        DO j = 1, n_open
-                WRITE(proba_all_unit,'(1ES20.10,1X,I5,1X,8I5,1X,1ES20.10)') &
-                        E*27.211399d0, Jtot, &
-                        quant_mat(1,open_idx(i)), quant_mat(2,open_idx(i)), &
-                        quant_mat(3,open_idx(i)), quant_mat(4,open_idx(i)), &
-                        quant_mat(1,open_idx(j)), quant_mat(2,open_idx(j)), &
-                        quant_mat(3,open_idx(j)), quant_mat(4,open_idx(j)), &
-                        ABS(Smat(i,j))**2.D0
-                ENDDO
-        ENDDO
+!        DO i = 1, n_open
+     !   DO j = 1, n_open
+    !            WRITE(proba_all_unit,'(1ES20.10,1X,I5,1X,8I5,1X,1ES20.10)') &
+     !                   E*27.211399d0, Jtot, &
+     !                   quant_mat(1,open_idx(i)), quant_mat(2,open_idx(i)), &
+     !                   quant_mat(3,open_idx(i)), quant_mat(4,open_idx(i)), &
+      !                  quant_mat(1,open_idx(j)), quant_mat(2,open_idx(j)), &
+      !                  quant_mat(3,open_idx(j)), quant_mat(4,open_idx(j)), &
+      !                  ABS(Smat(i,j))**2.D0
+      !          ENDDO
+      !  ENDDO
 
         !DEALLOCATE(knots_x, gq_root_x, gq_weight_x, knots_y, gq_root_y, gq_weight_y, STAT = istatus)
 
@@ -417,6 +427,8 @@ CALL calculate_RMS_potential_expansion
         ENDDO
 
         IF (ALLOCATED(Xsec_jpair)) DEALLOCATE(Xsec_jpair, STAT=istatus)
+
+        CALL profile_end('energy_level_total', energy_prof_t, energy_prof_rss)
 
         ENDDO ! E
 
@@ -716,6 +728,7 @@ CLOSE(proba_2020_table_unit)
         INTEGER :: quant_j1_prime, quant_k1_prime, quant_j2_prime, quant_k2_prime
         REAL(8) :: E_rot
         REAL(8) :: channel_delta
+        REAL(8) :: prof_t, prof_rss
         !REAL(8) modul, shift2delta
         !INTEGER, ALLOCATABLE, DIMENSION(:)      :: ipivx
 !
@@ -738,6 +751,8 @@ CLOSE(proba_2020_table_unit)
 !=============================================================================================
 ! NEW OPTIMIZED CODE: transfer ownership of the already-built potential
 ! matrix M_V to mat_M without copying its N x N data.
+        CALL profile_begin(prof_t, prof_rss)
+
         IF (.NOT. ALLOCATED(M_V)) THEN
                 PRINT*, 'Error: M_V is not allocated.'
                 STOP
@@ -745,7 +760,9 @@ CLOSE(proba_2020_table_unit)
 
         IF (ALLOCATED(mat_M)) DEALLOCATE(mat_M)
 
-        CALL MOVE_ALLOC(M_V, mat_M)
+        CALL MOVE_ALLOC(M_V, mat_M) 
+
+        print*, "Size of mat_M: ", dim_x * ncf, " x ", dim_x * ncf
 
         ALLOCATE(mat_M0(1:N,1:n_open), STAT=istatus)
         ALLOCATE(mat_M00(1:n_open,1:n_open), &
@@ -870,6 +887,7 @@ CLOSE(proba_2020_table_unit)
                               quant_j1_prime, quant_k1_prime, quant_j2_prime, quant_k2_prime)
         ENDDO
         ENDDO
+        CALL profile_end('make_scatt_mat_M0/00/10/*', prof_t, prof_rss)
 !
 !        PRINT*,'M_V'
 !        do i=1, min(N,6)
@@ -1012,6 +1030,7 @@ PRINT*, '==============================='
         REAL(8), ALLOCATABLE :: sum_array(:), workx(:)
         REAL(8), ALLOCATABLE :: rhs_re(:,:), rhs_im(:,:), modul(:,:)
         REAL(8) :: work_query(1)
+        REAL(8) :: prof_t, prof_rss
    
 
         COMPLEX(8), ALLOCATABLE :: solution_M0(:,:)
@@ -1066,6 +1085,7 @@ PRINT*, '==============================='
         rhs_re = REAL(mat_M0,KIND=8)
         rhs_im = AIMAG(mat_M0)
 
+        CALL profile_begin(prof_t, prof_rss)
         CALL DSYTRF('L',N,mat_M,N,ipiv_M,work_query,-1,infox)
         IF (infox /= 0) THEN
                 PRINT*, 'DSYTRF workspace query failed: ', infox
@@ -1081,7 +1101,9 @@ PRINT*, '==============================='
                 PRINT*, 'DSYTRF failed: ', infox
                 STOP
         ENDIF
+        CALL profile_end('DSYTRF_MM-1', prof_t, prof_rss)
 
+        CALL profile_begin(prof_t, prof_rss)
         CALL DSYTRS('L',N,n_open,mat_M,N,ipiv_M,rhs_re,N,infox)
         IF (infox /= 0) STOP 'DSYTRS failed for real part'
 
@@ -1089,7 +1111,9 @@ PRINT*, '==============================='
         IF (infox /= 0) STOP 'DSYTRS failed for imaginary part'
 
         solution_M0 = CMPLX(rhs_re,rhs_im,KIND=8)
+        CALL profile_end('DSYTRS', prof_t, prof_rss)
 
+        CALL profile_begin(prof_t, prof_rss)
         Bsub = MATMUL(TRANSPOSE(mat_M0),solution_M0)
         Csub = MATMUL(TRANSPOSE(CONJG(mat_M0)),solution_M0)
         mat_B = mat_M00 - Bsub
@@ -1120,6 +1144,7 @@ PRINT*, '==============================='
 
         Smat = (0d0,1d0) * &
                (mat_B-MATMUL(TRANSPOSE(mat_C),dum6vx))
+        CALL profile_end('Smat_Solve_FromBC', prof_t, prof_rss)
 
 !=============================================================================================
 ! END NEW OPTIMIZED MATRIX SOLVE

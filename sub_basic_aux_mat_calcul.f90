@@ -37,6 +37,7 @@
         INTEGER :: i, j, i_x, j_x, k, n, file_size, n_prime
         
         REAL(8) :: tm11, tm12, xm, dx, xr
+        REAL(8) :: prof_t, prof_rss
         !REAL(8) :: GetPotential, x1, x2, y1, y2 
         COMPLEX(8) :: sx1, sx3, sx4, sx1b, sx3b, sx4b
         COMPLEX(8) :: aux0_1, aux0_2, aux1_1, aux1_2, aux2_1, aux2_2, aux3_1, aux3_2
@@ -211,6 +212,8 @@
 !       Computation of basic auxiliary matrices
 !       ---------------------------------------
 
+
+        CALL profile_begin(prof_t, prof_rss)
 
         ALLOCATE ( BAM_x1(1:pbasst(1)%pb_nbr,1:n_open), BAM_x3(1:pbasst(1)%pb_nbr,1:n_open), BAM_x4(1:pbasst(1)%pb_nbr,1:n_open), &
                    norm_vec(1:pbasst(1)%pb_nbr), STAT = istatus )
@@ -566,6 +569,8 @@
         ! DEALLOCATE ( kvec, STAT=istatus)
 
         ENDIF
+
+        CALL profile_end('basic_aux_open', prof_t, prof_rss)
 
         CALL CPU_TIME(tm12)
         PRINT*, " "

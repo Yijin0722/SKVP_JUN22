@@ -16,6 +16,7 @@ SUBROUTINE potential_mat_calcul
         INTEGER :: row, col
         INTEGER :: ipot
         INTEGER :: Ntot
+        REAL(8) :: prof_t, prof_rss
 
 !
 !       Total closed-channel matrix dimension
@@ -40,6 +41,8 @@ SUBROUTINE potential_mat_calcul
 !
 !       Allocate matrices
 !       -----------------
+        CALL profile_begin(prof_t, prof_rss)
+
         IF (ALLOCATED(M_V)) DEALLOCATE(M_V, STAT = istatus)
         ALLOCATE(M_V(1:Ntot,1:Ntot), STAT = istatus)
         IF (istatus /= 0) THEN
@@ -139,6 +142,8 @@ SUBROUTINE potential_mat_calcul
         ENDDO
         ENDDO
 
+        CALL profile_end('Calculate Potential Matrices M_V/0/00/10/*', prof_t, prof_rss)
+
 END SUBROUTINE potential_mat_calcul
 !
 !*********************************************************************************************
@@ -164,9 +169,13 @@ SUBROUTINE build_BAM_rs
         INTEGER :: l, ipot
         INTEGER :: q
         REAL(8) :: xm, xr, dx, sxv
+        REAL(8) :: prof_t, prof_rss
         COMPLEX(8) :: sxv0
 
+        CALL profile_begin(prof_t, prof_rss)
         CALL read_A_cache(knots_x, gq_root_x, ngqp_x)
+        CALL profile_end('read_A_cache', prof_t, prof_rss)
+        CALL profile_begin(prof_t, prof_rss)
 !
 !       Allocate BAM_r
 !       --------------
@@ -335,6 +344,8 @@ SUBROUTINE build_BAM_rs
         ENDDO
         ENDDO
 
+        CALL profile_end('Build BAM_r/0/00/10/*', prof_t, prof_rss)
+
 END SUBROUTINE build_BAM_rs
 !
 !*********************************************************************************************
@@ -373,11 +384,14 @@ SUBROUTINE build_BAM_thetas
         INTEGER :: j1, k1, j2, k2
         INTEGER :: j1_prime, k1_prime, j2_prime, k2_prime
         REAL(8) :: G1p, G2p, G1m, G2m, basis_factor
+        REAL(8) :: prof_t, prof_rss
 !
 
       
 !       Allocate BAM_theta
 !       ------------------
+        CALL profile_begin(prof_t, prof_rss)
+
         IF (ALLOCATED(BAM_theta)) THEN
                 DEALLOCATE(BAM_theta, STAT = istatus)
         ENDIF
@@ -432,16 +446,13 @@ SUBROUTINE build_BAM_thetas
                 ENDDO
         ENDDO
 !
+        CALL profile_end('Build_BAM_theta', prof_t, prof_rss)
+!
 !=============================================================================================
 !
 END SUBROUTINE build_BAM_thetas
 !
 !*********************************************************************************************
 !=============================================================================================
-
-
-
-
-
 
 

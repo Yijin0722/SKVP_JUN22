@@ -10,6 +10,8 @@
 !
 !
 !
+ USE, INTRINSIC :: ISO_C_BINDING, ONLY: C_INT
+
  IMPLICIT NONE
 !
  SAVE
@@ -44,6 +46,12 @@
 INTEGER, allocatable, dimension(:) :: open_idx
  REAL ( 8 ), ALLOCATABLE , DIMENSION (:,:) :: Xsec_jpair
 
+ INTERFACE
+        INTEGER(C_INT) FUNCTION c_getpid() BIND(C, NAME="getpid")
+                IMPORT :: C_INT
+        END FUNCTION c_getpid
+ END INTERFACE
+
 
 
 !
@@ -53,6 +61,123 @@ INTEGER, allocatable, dimension(:) :: open_idx
 !
 !
 !*********************************************************************************************
+!*********************************************************************************************
+!
+ REAL(8) FUNCTION profile_wall_seconds()
+!
+!*********************************************************************************************
+!
+!       Wall-clock timer used by lightweight profiling markers.
+!
+!=============================================================================================
+!
+        INTEGER :: count, count_rate, count_max
+
+        CALL SYSTEM_CLOCK(count, count_rate, count_max)
+
+        IF (count_rate > 0) THEN
+                profile_wall_seconds = DBLE(count) / DBLE(count_rate)
+        ELSE
+                profile_wall_seconds = 0d0
+        ENDIF
+!
+!=============================================================================================
+ END FUNCTION profile_wall_seconds
+!=============================================================================================
+!
+!
+!*********************************************************************************************
+!
+ REAL(8) FUNCTION profile_rss_mb()
+!
+!*********************************************************************************************
+!
+!       Current resident set size in MB.  Uses ps so it works on macOS
+!       and Linux without platform-specific Fortran extensions.
+!
+!=============================================================================================
+!
+        INTEGER(C_INT) :: pid
+        INTEGER :: unit_id, io_status, exit_status, command_status
+        INTEGER :: rss_kb
+        CHARACTER(LEN=32) :: pid_text
+        CHARACTER(LEN=256) :: tmp_file, command
+
+        profile_rss_mb = -1d0
+
+        pid = c_getpid()
+        WRITE(pid_text,'(I0)') pid
+        tmp_file = '.skvp_profile_rss_' // TRIM(ADJUSTL(pid_text)) // '.tmp'
+        command = 'ps -o rss= -p ' // TRIM(ADJUSTL(pid_text)) // ' > ' // TRIM(tmp_file)
+
+        CALL EXECUTE_COMMAND_LINE(TRIM(command), WAIT=.TRUE., &
+                                  EXITSTAT=exit_status, CMDSTAT=command_status)
+
+        IF (command_status /= 0 .OR. exit_status /= 0) RETURN
+
+        OPEN(NEWUNIT=unit_id, FILE=TRIM(tmp_file), STATUS='OLD', &
+             ACTION='READ', IOSTAT=io_status)
+
+        IF (io_status /= 0) RETURN
+
+        READ(unit_id,*,IOSTAT=io_status) rss_kb
+        CLOSE(unit_id, STATUS='DELETE')
+
+        IF (io_status == 0) profile_rss_mb = DBLE(rss_kb) / 1024d0
+!
+!=============================================================================================
+ END FUNCTION profile_rss_mb
+!=============================================================================================
+!
+!
+!*********************************************************************************************
+!
+ SUBROUTINE profile_begin(start_time, start_rss_mb)
+!
+!*********************************************************************************************
+!
+        REAL(8), INTENT(OUT) :: start_time, start_rss_mb
+
+        start_time   = profile_wall_seconds()
+        start_rss_mb = profile_rss_mb()
+
+ END SUBROUTINE profile_begin
+!=============================================================================================
+!
+!
+!*********************************************************************************************
+!
+ SUBROUTINE profile_end(label, start_time, start_rss_mb)
+!
+!*********************************************************************************************
+!
+        CHARACTER(LEN=*), INTENT(IN) :: label
+        REAL(8), INTENT(IN) :: start_time, start_rss_mb
+        REAL(8) :: end_time, end_rss_mb, elapsed, delta_rss
+
+        end_time   = profile_wall_seconds()
+        end_rss_mb = profile_rss_mb()
+        elapsed    = end_time - start_time
+
+        IF (start_rss_mb >= 0d0 .AND. end_rss_mb >= 0d0) THEN
+                delta_rss = end_rss_mb - start_rss_mb
+                WRITE(6,'(A,1X,A,1X,A,F12.3,1X,A,F12.3,1X,A,F12.3,1X,A,ES14.6,1X,A,I8,1X,A,I8,1X,A,I8)') &
+                        'PROF', 'stage='//TRIM(label), 'time_s=', elapsed, &
+                        'rss_mb=', end_rss_mb, 'delta_mb=', delta_rss, &
+                        'E_Ha=', E, 'Jtot=', Jtot, 'ncf=', ncf, 'n_open=', n_open
+        ELSE
+                WRITE(6,'(A,1X,A,1X,A,F12.3,1X,A,1X,A,ES14.6,1X,A,I8,1X,A,I8,1X,A,I8)') &
+                        'PROF', 'stage='//TRIM(label), 'time_s=', elapsed, &
+                        'rss_mb=NA', 'E_Ha=', E, 'Jtot=', Jtot, &
+                        'ncf=', ncf, 'n_open=', n_open
+        ENDIF
+
+        FLUSH(6)
+
+ END SUBROUTINE profile_end
+!=============================================================================================
+!
+!
 !*********************************************************************************************
 !
 !  LOGICAL FUNCTION iseven(m)

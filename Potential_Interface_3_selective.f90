@@ -53,8 +53,8 @@ MODULE Potential_Interface
 !
 !       Gaussian quadrature parameters for angular projection
 !       -----------------------------------------------------
-        INTEGER, PARAMETER :: nx_A   = 23
-        INTEGER, PARAMETER :: nphi_A = 23
+        INTEGER, PARAMETER :: nx_A   = 15
+        INTEGER, PARAMETER :: nphi_A = 15
 
         REAL(dp), PARAMETER :: pi_A = 3.1415926535897932384626433832795_dp
 

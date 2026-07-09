@@ -32,7 +32,7 @@ MODULE Potential_Interface
 
         REAL(dp), PARAMETER :: pi_A = 3.1415926535897932384626433832795_dp
 
-        INTEGER, PARAMETER :: A_cache_version = 2
+        INTEGER, PARAMETER :: A_cache_version = 1
         INTEGER, PARAMETER :: cache_id_len = 128
         CHARACTER(LEN=*), PARAMETER :: A_cache_filename = 'A_cache.dat'
         !CHARACTER(LEN=cache_id_len), PARAMETER :: potential_id = 'BMKP_cm-1_v1'
@@ -454,12 +454,15 @@ CONTAINS
                 INTEGER :: unit_cache
                 INTEGER :: io_status
 
-                REAL(dp) :: xm, xr, dx
-                REAL(dp) :: R_plus, R_minus
+	                REAL(dp) :: xm, xr, dx
+	                REAL(dp) :: R_plus, R_minus
+	                REAL(dp) :: prof_t, prof_rss
 
-                REAL(dp) :: A_all(0:lambda1_max_default, &
+	                REAL(dp) :: A_all(0:lambda1_max_default, &
                                   0:lambda2_max_default, &
                                   0:m_max_default)
+
+                call profile_begin(prof_t, prof_rss)
 
 !
 !       Safety checks
@@ -573,6 +576,8 @@ CONTAINS
                         PRINT*, 'A_cache written to file: ', A_cache_filename
                         PRINT*, 'potential_id = ', potential_id
                 ENDIF
+
+                call profile_end('Build A_cache', prof_t, prof_rss)
 
         END SUBROUTINE build_A_cache
 
